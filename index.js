@@ -41,6 +41,20 @@ async function run(){
     const usersCollection = client.db('doctorsPortal').collection('users');
     const doctorsCollection = client.db('doctorsPortal').collection('doctors');
 
+    //Note: Make sure you use verifyAmdin after verifyJWT
+
+    const verifyAdmin = async (req, res, next) => {
+      console.log('Insight verifyAmin email', req.decoded.email);
+      const decodedEmail = req.decoded.email;
+      const query = {email: decodedEmail};
+      const user = await usersCollection.findOne(query);
+      if(user?.role !== 'admin'){
+        return res.status(403).send({message: 'forbidden access'})
+      }
+      next();
+
+    }
+
     app.get('/appointmentOptions', async(req, res) => {
       const date = req.query.date;
       // console.log(date);
@@ -131,13 +145,7 @@ async function run(){
       res.send(result)
     })
 
-    app.put('/users/admin/:id', verifyJWT, async(req, res) => {
-      const decodedEmail = req.decoded.email;
-      const query = {email: decodedEmail}
-      const user = await usersCollection.findOne(query);
-      if(user?.role !== 'admin'){
-        return res.status(403).send({message: 'forbidden access'})
-      }
+    app.put('/users/admin/:id', verifyJWT, verifyAdmin, async(req, res) => {
       const id = req.params.id;
       const filter = {_id: ObjectId(id)}
       const options = {upsert: true}
@@ -150,15 +158,22 @@ async function run(){
       res.send(result)
     });
 
-    app.get('/doctors', async (req, res) => {
+    app.get('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
       const query = {}
       const doctors = await doctorsCollection.find(query).toArray();
       res.send(doctors)
     })
 
-    app.post('/doctors', async(req, res)=>{
+    app.post('/doctors', verifyJWT, verifyAdmin, async(req, res)=>{
       const doctor = req.body;
       const result = await doctorsCollection.insertOne(doctor);
+      res.send(result)
+    });
+
+    app.delete('/doctors/:id', verifyJWT, verifyAdmin, async(req, res) => {
+      const id = req.params.id;
+      const filter = {_id: ObjectId(id) }
+      const result = await doctorsCollection.deleteOne(filter);
       res.send(result)
     })
   }
